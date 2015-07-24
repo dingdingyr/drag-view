@@ -22,6 +22,8 @@ public class MainActivity extends RoboActivity {
     ImageView imageView2;
 
     int statusBarHeight;
+    int screenWidth;
+    int screenHeight;
 
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -30,8 +32,8 @@ public class MainActivity extends RoboActivity {
         statusBarHeight = WindowUtils.getStatusBarHeight(this);
 
         DisplayMetrics dm = getResources().getDisplayMetrics();
-        final int screenWidth = dm.widthPixels;
-        final int screenHeight = dm.heightPixels - statusBarHeight;
+        screenWidth = dm.widthPixels;
+        screenHeight = dm.heightPixels - statusBarHeight;
 
         /**
          * 移动思路1：A点按下，移动到B，在移动到C，抬起<br>
@@ -99,95 +101,101 @@ public class MainActivity extends RoboActivity {
             }
         });
 
-        /**
-         * A：移动思路2：A点按下，移动到B，在移动到C，抬起<br>
-         * （一）用户手指从A点移动到B点，控件跟着移动。在移动过程中，按下点在控件中的位置肯定保持不变。
-         * （二）如果我们知道（1）B点屏幕坐标（2）按下点在控件中的相对位置，不难算出控件位置
-         *
-         * B：监听点击事件
-         */
-        imageView2.setOnTouchListener(new OnTouchListener() {
-            private float downRelativeX; // 按下点在控件中的相对位置
-            private float downRelativeY;
+        imageView2.setOnTouchListener(new MyTouchListener());
+    }
 
-            private float downRawX; // 按下点屏幕坐标
-            private float downRawY;
+    /**
+     * 自定义的Touch事件监听器<br>
+     *
+     * <p>具有以下功能：</p>
+     * （1）移动控件<br>
+     *  移动思路2：A点按下，移动到B，在移动到C，抬起<br>
+     * （一）用户手指从A点移动到B点，控件跟着移动。在移动过程中，按下点在控件中的位置肯定保持不变。<br>
+     * （二）如果我们知道（1）B点屏幕坐标（2）按下点在控件中的相对位置，不难算出控件位置<br>
 
-            boolean isMoveEvent = false; // 标记是否是移动事件
+     * （2）监听点击事件<br>
+     */
+    public class MyTouchListener implements OnTouchListener {
+        private float downRelativeX; // 按下点在控件中的相对位置
+        private float downRelativeY;
 
-            /**
-             * 判断点击与移动时间阀值
-             */
-            private int MOVE_AND_CLICK_THRESHOLD = 10;
+        private float downRawX; // 按下点屏幕坐标
+        private float downRawY;
 
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        Log.e(TAG, "ACTION_DOWN");
-                        downRelativeX = event.getX();
-                        downRelativeY = event.getY();
+        boolean isMoved; // 标记是否移动
+        private int MOVE_AND_CLICK_THRESHOLD = 10; // 判断点击与移动时间阀值
 
-                        downRawX = event.getRawX();
-                        downRawY = event.getRawY();
-                        Log.e(TAG, "downRaw=（" + downRawX + "," + downRawY + ")");
+        public boolean onTouch(View v, MotionEvent event) {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    Log.e(TAG, "ACTION_DOWN");
+                    downRelativeX = event.getX();
+                    downRelativeY = event.getY();
 
-                        isMoveEvent = false;
-                        break;
-                    case MotionEvent.ACTION_MOVE:
-                        Log.e(TAG, "ACTION_MOVE");
-                        Log.e(TAG, "event=（" + event.getRawX() + "," + event.getRawY() + ")");
+                    downRawX = event.getRawX();
+                    downRawY = event.getRawY();
+                    Log.e(TAG, "downRaw=（" + downRawX + "," + downRawY + ")");
 
-                        // 计算事件位置和按下位置的距离
-                        float dx = event.getRawX() - downRawX;
-                        float dy = event.getRawY() - downRawY;
+                    isMoved = false;
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    Log.e(TAG, "ACTION_MOVE");
+                    Log.e(TAG, "event=（" + event.getRawX() + "," + event.getRawY() + ")");
 
-                        // 如果移动距离大于阀值，则认为是移动事件
-                        // 如果是移动事件，移动控件
-                        if (isMoveEvent || dx * dx + dy * dy > MOVE_AND_CLICK_THRESHOLD) {
-                            isMoveEvent = true;
+                    // 计算手指当前位置和按下位置的距离
+                    float dx = event.getRawX() - downRawX;
+                    float dy = event.getRawY() - downRawY;
 
-                            // 计算控件位置
-                            int left = (int) (event.getRawX() - downRelativeX);
-                            int top = (int) (event.getRawY() - statusBarHeight - downRelativeY);
-                            int right = left + v.getWidth();
-                            int bottom = top + v.getHeight();
+                    // 如果移动距离大于阀值，则认为用户希望移动控件
+                    // 此时，移动控件
+                    if (isMoved || dx * dx + dy * dy > MOVE_AND_CLICK_THRESHOLD) {
+                        isMoved = true;
 
-                            // 检查控件位置是否正确，如果不正确，修改之
-                            if (left < 0) {
-                                left = 0;
-                                right = left + v.getWidth();
-                            }
+                        // 计算控件位置
+                        int left = (int) (event.getRawX() - downRelativeX);
+                        int top = (int) (event.getRawY() - statusBarHeight - downRelativeY);
+                        int right = left + v.getWidth();
+                        int bottom = top + v.getHeight();
 
-                            if (right > screenWidth) {
-                                right = screenWidth;
-                                left = right - v.getWidth();
-                            }
-
-                            if (top < 0) {
-                                top = 0;
-                                bottom = top + v.getHeight();
-                            }
-
-                            if (bottom > screenHeight) {
-                                bottom = screenHeight;
-                                top = bottom - v.getHeight();
-                            }
-
-                            // 设置控件位置
-                            v.layout(left, top, right, bottom);
+                        // 检查控件位置是否正确，如果不正确，修改之
+                        if (left < 0) {
+                            left = 0;
+                            right = left + v.getWidth();
                         }
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        Log.e(TAG, "ACTION_UP");
-                        // 如果是点击事件
-                        if(!isMoveEvent){
-                            ToastUtils.show(MainActivity.this, "onClick");
-                        }
-                        break;
-                }
 
-                return true;
+                        if (right > screenWidth) {
+                            right = screenWidth;
+                            left = right - v.getWidth();
+                        }
+
+                        if (top < 0) {
+                            top = 0;
+                            bottom = top + v.getHeight();
+                        }
+
+                        if (bottom > screenHeight) {
+                            bottom = screenHeight;
+                            top = bottom - v.getHeight();
+                        }
+
+                        // 设置控件位置
+                        v.layout(left, top, right, bottom);
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                    Log.e(TAG, "ACTION_UP");
+                    // 当手指抬起时，如果没有移动控件，说明是点击行为
+                    if (!isMoved) {
+                        onClick();
+                    }
+                    break;
             }
-        });
+
+            return true;
+        }
+
+        private void onClick(){
+            ToastUtils.show(MainActivity.this, "onClick");
+        }
     }
 }
